@@ -350,16 +350,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' &&
                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                 
                 const tr = document.createElement('tr');
-                tr.className = isWeekend ? 'bg-gray-300' : '';  // Darker gray for weekends
+                tr.className = isWeekend ? 'bg-gray-300' : '';
                 
                 tr.innerHTML = `
                     <td class="p-0.5 border-b">${dayName}</td>
                     <td class="p-0.5 border-b">${formatDate(date)}</td>
                     <td class="p-0.5 border-b">
-                        <input type="text" value="0" class="border rounded p-0.5 w-12 text-right text-xs">
+                        <input type="text" value="0" 
+                               class="border rounded p-0.5 w-12 text-right text-xs"
+                               oninput="validateHours(this)"
+                               onblur="formatHours(this)">
                     </td>
                     <td class="p-0.5 border-b">
-                        <input type="text" value="" class="border rounded p-0.5 w-full text-xs">
+                        <input type="text" value="" 
+                               class="border rounded p-0.5 w-full text-xs"
+                               oninput="validateReason(this)"
+                               maxlength="255">
                     </td>
                 `;
                 
@@ -372,6 +378,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' &&
             tbody.querySelectorAll('input').forEach(input => {
                 input.addEventListener('input', debouncedSave);
             });
+        }
+
+        function validateReason(input) {
+            // Remove any potentially dangerous characters and HTML
+            let value = input.value;
+            
+            // Remove HTML tags
+            value = value.replace(/<[^>]*>/g, '');
+            
+            // Remove special characters that could be used for XSS or SQL injection
+            value = value.replace(/[<>'"\\;]/g, '');
+            
+            // Convert any remaining potentially dangerous characters to their HTML entities
+            value = value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#x27;')
+                .replace(/\//g, '&#x2F;');
+
+            // Allow only printable characters and common punctuation
+            value = value.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '');
+
+            // Trim whitespace
+            value = value.trim();
+            
+            // Update value if it changed
+            if (value !== input.value) {
+                input.value = value;
+            }
+        }
+
+        function validateHours(input) {
+            // Remove any non-numeric characters except decimal point
+            let value = input.value.replace(/[^\d.]/g, '');
+            
+            // Ensure only one decimal point
+            const decimalPoints = value.match(/\./g);
+            if (decimalPoints && decimalPoints.length > 1) {
+                value = value.slice(0, value.lastIndexOf('.'));
+            }
+
+            // Check if the number is greater than 24
+            const numValue = parseFloat(value);
+            if (numValue > 24) {
+                value = '24';
+            }
+
+            // Limit to 2 decimal places
+            if (value.includes('.')) {
+                const parts = value.split('.');
+                value = `${parts[0]}.${parts[1].slice(0, 2)}`;
+            }
+
+            input.value = value;
+        }
+
+        function formatHours(input) {
+            // When leaving the field, ensure proper formatting
+            let value = input.value;
+            if (value === '') {
+                value = '0';
+            }
+
+            // Format to 2 decimal places if there's a decimal point
+            if (value.includes('.')) {
+                value = parseFloat(value).toFixed(2);
+            }
+
+            input.value = value;
+            saveTimesheet();
         }
 
         async function saveSettings() {
